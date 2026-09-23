@@ -298,6 +298,22 @@ def read_uploaded_file(filename: str, data: bytes, side: str, file_index: int = 
         return FileReadResult(side, filename, "ok", fragments)
     except ValueError as exc:
         return FileReadResult(side, filename, "error", message=str(exc))
+    except ModuleNotFoundError as exc:
+        missing_module = exc.name or "неизвестный модуль"
+        dependency = {"docx": "python-docx", "pypdf": "pypdf"}.get(missing_module)
+        if dependency:
+            message = (
+                f"На сервере не установлена библиотека «{dependency}», нужная для чтения файла. "
+                "Это ошибка настройки сайта, а не повреждение документа. Проверьте установку "
+                "зависимостей из requirements.txt и перезапустите или повторно разверните сайт."
+            )
+        else:
+            message = (
+                f"На сервере не найден Python-модуль «{missing_module}» при чтении файла. "
+                "Это ошибка настройки сайта, а не повреждение документа. Проверьте установку "
+                "зависимостей из requirements.txt и перезапустите сайт."
+            )
+        return FileReadResult(side, filename, "error", message=message)
     except Exception as exc:
         return FileReadResult(
             side,
