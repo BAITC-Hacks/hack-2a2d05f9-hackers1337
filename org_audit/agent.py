@@ -228,7 +228,7 @@ class OpenAIProvider:
         response = self.client.responses.create(
             model=self.model,
             instructions=instructions,
-            input=input_value,
+            input=input_value + "\n\nВерни итоговый ответ в формате json.",
             tools=TOOL_DEFINITIONS,
             parallel_tool_calls=False,
             text={"format": {"type": "json_object"}},
@@ -270,7 +270,9 @@ class OpenAIProvider:
             response = self.client.responses.create(
                 model=self.model,
                 instructions=instructions,
-                input=previous_items + outputs,
+                input=previous_items
+                + outputs
+                + [{"role": "user", "content": "Верни итоговый ответ в формате json."}],
                 tools=TOOL_DEFINITIONS,
                 parallel_tool_calls=False,
                 text={"format": {"type": "json_object"}},
