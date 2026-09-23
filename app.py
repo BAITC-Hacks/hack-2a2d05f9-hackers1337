@@ -166,10 +166,20 @@ if st.button("Сравнить документы", type="primary", disabled=not
                 }
                 status.update(label="Анализ завершён", state="complete", expanded=False)
         except Exception as exc:
-            st.error(
-                f"Не удалось завершить анализ ({type(exc).__name__}). "
-                "Проверьте доступность API, ключ и OPENAI_MODEL; повторите позже."
-            )
+            message = f"Не удалось завершить анализ ({type(exc).__name__})."
+            api_message = getattr(exc, "message", None)
+            if isinstance(api_message, str) and api_message.strip():
+                message += f" Ответ API: {api_message.strip()[:500]}"
+            error_code = getattr(exc, "code", None)
+            if error_code:
+                message += f" Код: {error_code}."
+            error_param = getattr(exc, "param", None)
+            if error_param:
+                message += f" Параметр: {error_param}."
+            request_id = getattr(exc, "request_id", None)
+            if request_id:
+                message += f" ID запроса: {request_id}."
+            st.error(message)
 
 saved = st.session_state.get("audit_result")
 if saved and saved.get("fingerprint") == current_fingerprint:
