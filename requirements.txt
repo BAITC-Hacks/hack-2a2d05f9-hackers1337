@@ -1,4 +1,4 @@
-streamlit>=1.40
+streamlit>=1.57
 python-docx>=1.1
 pypdf>=5.1
 openai>=1.66
