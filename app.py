@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from org_audit.agent import DEFAULT_MODEL, analyze_documents, provider_from_env
 from org_audit.models import CATEGORY_LABELS
-from org_audit.reader import MAX_FILES_PER_SIDE, MAX_TOTAL_BYTES, read_file_batch
+from org_audit.reader import MAX_FILE_BYTES, MAX_FILES_PER_SIDE, MAX_TOTAL_BYTES, read_file_batch
 from org_audit.report import build_markdown_report, results_csv
 
 
@@ -18,6 +18,245 @@ st.set_page_config(
     page_title="Контур — аудит оргструктуры",
     page_icon=":material/account_tree:",
     layout="wide",
+)
+
+st.html(
+    """
+    <style>
+    .block-container {
+        max-width: 1360px;
+        padding-top: 2.2rem;
+        padding-bottom: 4rem;
+    }
+    [data-testid="stAppViewContainer"] {
+        background-image:
+            radial-gradient(ellipse at 8% 0%, rgba(183, 208, 124, .13), transparent 28rem),
+            radial-gradient(ellipse at 95% 8%, rgba(93, 144, 128, .08), transparent 25rem);
+    }
+    .stButton > button, .stDownloadButton > button {
+        min-height: 2.8rem;
+        font-weight: 650;
+        transition: transform .16s ease, box-shadow .16s ease;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 22px rgba(20, 61, 51, .12);
+    }
+    [data-testid="stFileUploaderDropzone"] {
+        border: 1px dashed #9eafa4;
+        background: linear-gradient(135deg, #fbfcf8 0%, #f3f7ef 100%);
+        transition: border-color .16s ease, background .16s ease;
+    }
+    [data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #327565;
+        background: #f0f6ed;
+    }
+    div[data-testid="stMetric"] {
+        padding: 1rem 1.1rem;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, .78);
+        box-shadow: 0 6px 22px rgba(29, 48, 40, .035);
+    }
+    .contour-hero {
+        position: relative;
+        isolation: isolate;
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr);
+        gap: 2rem;
+        align-items: center;
+        overflow: hidden;
+        min-height: 330px;
+        padding: clamp(1.6rem, 4vw, 3.4rem);
+        border: 1px solid rgba(255, 255, 255, .13);
+        border-radius: 30px;
+        color: #f3f6ed;
+        background:
+            radial-gradient(ellipse at 83% 50%, rgba(103, 159, 127, .29), transparent 32%),
+            linear-gradient(118deg, #122c27 0%, #163a32 57%, #1d4940 100%);
+        box-shadow: 0 24px 70px rgba(26, 54, 44, .16);
+    }
+    .contour-hero::before, .contour-hero::after {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        width: 380px;
+        height: 380px;
+        border: 1px solid rgba(228, 242, 211, .11);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    .contour-hero::before {
+        top: -245px;
+        right: -46px;
+        box-shadow: 0 0 0 30px rgba(228, 242, 211, .025), 0 0 0 70px rgba(228, 242, 211, .025);
+    }
+    .contour-hero::after {
+        right: 80px;
+        bottom: -326px;
+        width: 290px;
+        height: 290px;
+        border-color: rgba(228, 242, 211, .08);
+    }
+    .hero-copy, .hero-visual { position: relative; z-index: 1; }
+    .hero-kicker, .map-caption {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        color: #c2d6c6;
+        font-size: .69rem;
+        font-weight: 700;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+    }
+    .hero-spark {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #c4e77d;
+        box-shadow: 0 0 0 5px rgba(196, 231, 125, .12), 0 0 18px rgba(196, 231, 125, .65);
+    }
+    .hero-copy h1 {
+        margin: 1.1rem 0 .9rem;
+        color: #f5f7ef;
+        font-size: clamp(2.25rem, 4.7vw, 4.25rem);
+        font-weight: 650;
+        letter-spacing: -.055em;
+        line-height: 1.02;
+    }
+    .hero-copy h1 em {
+        color: #c9e88b;
+        font-style: normal;
+    }
+    .hero-copy p {
+        max-width: 610px;
+        margin: 0;
+        color: #c5d3ca;
+        font-size: 1rem;
+        line-height: 1.65;
+    }
+    .hero-tags {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .7rem;
+        margin-top: 1.5rem;
+    }
+    .hero-tags span {
+        padding: .37rem .65rem;
+        border: 1px solid rgba(218, 237, 215, .2);
+        border-radius: 999px;
+        color: #eef5e6;
+        background: rgba(255, 255, 255, .055);
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .08em;
+    }
+    .hero-tags b { color: #c9e88b; font-size: .85rem; }
+    .hero-tags small { color: #b6c9bd; font-size: .72rem; }
+    .hero-visual {
+        max-width: 420px;
+        justify-self: end;
+        width: 100%;
+        padding: 1.25rem;
+        border: 1px solid rgba(226, 240, 221, .18);
+        border-radius: 22px;
+        background: linear-gradient(145deg, rgba(242, 248, 234, .10), rgba(242, 248, 234, .035));
+        box-shadow: inset 0 1px rgba(255, 255, 255, .1), 0 18px 44px rgba(4, 18, 15, .12);
+        backdrop-filter: blur(12px);
+    }
+    .map-caption { justify-content: space-between; font-size: .62rem; }
+    .map-live { color: #c9e88b; letter-spacing: .08em; }
+    .map-node {
+        display: flex;
+        align-items: center;
+        gap: .8rem;
+        padding: .8rem .85rem;
+        border: 1px solid rgba(226, 240, 221, .15);
+        border-radius: 15px;
+        background: rgba(11, 33, 28, .35);
+    }
+    .map-node:not(.map-node--after) { margin-top: 1.1rem; }
+    .map-node--after { background: rgba(201, 232, 139, .08); border-color: rgba(201, 232, 139, .26); }
+    .map-key {
+        display: grid;
+        flex: 0 0 35px;
+        width: 35px;
+        height: 35px;
+        place-items: center;
+        border-radius: 12px;
+        color: #102b25;
+        background: #d1e99c;
+        font-size: .84rem;
+        font-weight: 800;
+    }
+    .map-node--after .map-key { color: #eef5e8; background: #497c6d; }
+    .map-node-text { display: grid; gap: .15rem; }
+    .map-node-text small { color: #a8c1b1; font-size: .61rem; letter-spacing: .12em; }
+    .map-node-text strong { color: #f1f5ed; font-size: .9rem; font-weight: 650; }
+    .map-step {
+        margin-left: auto;
+        color: #9cb7a8;
+        font-family: monospace;
+        font-size: .72rem;
+    }
+    .map-connector {
+        display: flex;
+        align-items: center;
+        gap: .65rem;
+        height: 42px;
+        margin-left: 1.9rem;
+        color: #badc8a;
+    }
+    .map-connector svg { width: 28px; height: 42px; flex: 0 0 28px; }
+    .map-connector span { color: #b2c7ba; font-size: .68rem; }
+    .map-foot {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin-top: 1rem;
+        color: #b7cabd;
+        font-size: .68rem;
+    }
+    .map-foot-dot { width: 6px; height: 6px; border-radius: 50%; background: #c9e88b; }
+    .flow-track {
+        display: grid;
+        grid-template-columns: 1fr 26px 1fr 26px 1fr;
+        align-items: center;
+        gap: .6rem;
+        margin: 1.25rem 0 2.4rem;
+        padding: .85rem 1.15rem;
+        border: 1px solid #e0e7de;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, .72);
+    }
+    .flow-step { display: flex; align-items: center; gap: .7rem; }
+    .flow-number {
+        display: grid;
+        flex: 0 0 31px;
+        width: 31px;
+        height: 31px;
+        place-items: center;
+        border-radius: 11px;
+        color: #1a574a;
+        background: #e8f0df;
+        font-size: .7rem;
+        font-weight: 800;
+    }
+    .flow-step strong { display: block; color: #22332b; font-size: .79rem; font-weight: 700; }
+    .flow-step small { display: block; margin-top: .12rem; color: #78877d; font-size: .68rem; }
+    .flow-arrow { color: #a7b5a9; text-align: center; }
+    @media (max-width: 760px) {
+        .block-container { padding-top: 1.2rem; }
+        .contour-hero { grid-template-columns: 1fr; gap: 1.5rem; min-height: 0; padding: 1.5rem; border-radius: 22px; }
+        .hero-visual { justify-self: stretch; max-width: none; }
+        .flow-track { grid-template-columns: 1fr; gap: .45rem; }
+        .flow-arrow { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+    </style>
+    """
 )
 
 
@@ -105,6 +344,46 @@ def _render_error(exc: Exception) -> None:
     st.error(message)
 
 
+def _render_hero() -> None:
+    st.html(
+        """
+        <section class="contour-hero" aria-label="Аудит изменений организационной структуры">
+          <div class="hero-copy">
+            <div class="hero-kicker"><span class="hero-spark"></span> Контур · системный аудит функций</div>
+            <h1>Структура меняется.<br><em>Смысл должен сойтись.</em></h1>
+            <p>Сопоставь документы до и после реорганизации. Найди, что сохранилось, изменилось или перешло между командами — с точными цитатами из источников.</p>
+            <div class="hero-tags"><span>ДО</span><b>→</b><span>ПОСЛЕ</span><small>от документов к проверяемой карте функций</small></div>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="map-caption"><span>КАРТА ИЗМЕНЕНИЙ</span><span class="map-live">● ГОТОВА К АНАЛИЗУ</span></div>
+            <div class="map-node">
+              <span class="map-key">A</span>
+              <span class="map-node-text"><small>КОМПЛЕКТ 01</small><strong>До изменений</strong></span>
+              <span class="map-step">01</span>
+            </div>
+            <div class="map-connector">
+              <svg viewBox="0 0 28 42" fill="none" aria-hidden="true"><path d="M14 1v37m0 0-5-5m5 5 5-5" stroke="#badc8a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="9" r="3" fill="#c9e88b"/></svg>
+              <span>смысл · подразделение · источник</span>
+            </div>
+            <div class="map-node map-node--after">
+              <span class="map-key">B</span>
+              <span class="map-node-text"><small>КОМПЛЕКТ 02</small><strong>После изменений</strong></span>
+              <span class="map-step">02</span>
+            </div>
+            <div class="map-foot"><span class="map-foot-dot"></span> каждый вывод можно проверить по цитате</div>
+          </div>
+        </section>
+        <div class="flow-track" aria-label="Этапы работы">
+          <div class="flow-step"><span class="flow-number">01</span><span><strong>Загрузи документы</strong><small>Комплекты до и после</small></span></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step"><span class="flow-number">02</span><span><strong>Проверь извлечение</strong><small>Текст и источники</small></span></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step"><span class="flow-number">03</span><span><strong>Изучи карту функций</strong><small>Выводы и доказательства</small></span></div>
+        </div>
+        """
+    )
+
+
 api_key = os.getenv("OPENAI_API_KEY", "").strip()
 selected_model = os.getenv("OPENAI_MODEL", "").strip() or DEFAULT_MODEL
 
@@ -127,35 +406,16 @@ with st.sidebar:
     )
     with st.expander("Форматы и ограничения"):
         st.write("Поддерживаются TXT, DOCX и PDF с текстовым слоем.")
-        st.write(f"До {MAX_FILES_PER_SIDE} файлов и {MAX_TOTAL_BYTES // (1024 * 1024)} МБ на комплект.")
+        st.write(
+            f"До {MAX_FILES_PER_SIDE} файлов, {MAX_FILE_BYTES // (1024 * 1024)} МБ на файл "
+            f"и {MAX_TOTAL_BYTES // (1024 * 1024)} МБ на комплект."
+        )
         st.write("Сканы PDF требуют OCR. Документы отправляются в OpenAI API только после подтверждения.")
 
 
-st.caption("РАБОЧЕЕ ПРОСТРАНСТВО  /  ДОКУМЕНТАЛЬНЫЙ АУДИТ")
-st.title("Контур", icon=":material/account_tree:")
-st.subheader("Сравнение функций до и после реорганизации")
-st.write(
-    "Найди сохранённые, изменённые и переданные обязанности — и проверь каждый вывод "
-    "по точной цитате из исходного документа."
-)
+_render_hero()
 
-step_columns = st.columns(3)
-for column, number, title, description in zip(
-    step_columns,
-    ("01", "02", "03"),
-    ("Загрузка", "Проверка", "Сравнение"),
-    (
-        "Добавь комплекты документов до и после.",
-        "Убедись, что нужный текст извлечён.",
-        "Изучи выводы вместе с подтверждениями.",
-    ),
-):
-    with column.container(border=True):
-        st.caption(f"ШАГ {number}")
-        st.markdown(f"#### {title}")
-        st.caption(description)
-
-st.header("1. Добавьте комплекты", icon=":material/folder_open:")
+st.header("Подготовь пару документов", icon=":material/folder_open:")
 with st.container(border=True):
     before_col, after_col = st.columns(2)
     with before_col:
@@ -165,8 +425,9 @@ with st.container(border=True):
             "Файлы до реорганизации",
             type=["txt", "docx", "pdf"],
             accept_multiple_files=True,
+            max_upload_size=MAX_FILE_BYTES // (1024 * 1024),
             key="before_uploads",
-            help="Можно выбрать несколько документов.",
+            help=f"До {MAX_FILES_PER_SIDE} файлов; каждый не больше {MAX_FILE_BYTES // (1024 * 1024)} МБ.",
         )
     with after_col:
         st.markdown("#### :material/auto_awesome: После изменений")
@@ -175,8 +436,9 @@ with st.container(border=True):
             "Файлы после реорганизации",
             type=["txt", "docx", "pdf"],
             accept_multiple_files=True,
+            max_upload_size=MAX_FILE_BYTES // (1024 * 1024),
             key="after_uploads",
-            help="Можно выбрать несколько документов.",
+            help=f"До {MAX_FILES_PER_SIDE} файлов; каждый не больше {MAX_FILE_BYTES // (1024 * 1024)} МБ.",
         )
 
 use_demo = st.checkbox(
@@ -201,7 +463,7 @@ successful_after = after_count > 0
 current_fingerprint = _fingerprint(read_files)
 has_uploads = bool(before_files or after_files)
 
-st.header("2. Проверьте извлечённый текст", icon=":material/fact_check:")
+st.header("Проверь извлечённый текст", icon=":material/fact_check:")
 if has_uploads:
     issue_count = sum(item.status != "ok" for item in read_files)
     with st.container(border=True):
@@ -222,7 +484,7 @@ else:
     with st.container(border=True):
         st.info("Загрузи хотя бы один файл в каждый комплект. Для знакомства можно включить демонстрационные данные.")
 
-st.header("3. Запустите сравнение", icon=":material/compare_arrows:")
+st.header("Запусти сравнение", icon=":material/compare_arrows:")
 privacy_confirmed = False
 with st.container(border=True):
     if not api_key:
